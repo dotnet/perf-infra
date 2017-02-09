@@ -46,7 +46,7 @@ def downloadAndUnpack(sourceLocation, targetLocation):
 def writeBenchviewCSV(results):
     csvFile = open("stability.csv", 'w')
     for value in results:
-        csvFile.write("blackscholes,stability,{0}\r\n".format(value))
+        csvFile.write("blackscholes,stability,{0}\n".format(value))
     return 0
 
 def runAndProcess(commandLine, processFunc):
