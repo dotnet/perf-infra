@@ -46,7 +46,7 @@ def downloadAndUnpack(sourceLocation, targetLocation):
 def writeBenchviewCSV(results):
     csvFile = open("stability.csv", 'w')
     for value in results:
-        csvFile.write("blackscholes,stability,{0}\r\n".format(value))
+        csvFile.write("blackscholes,stability,{0}\n".format(value))
     return 0
 
 def runAndProcess(commandLine, processFunc):
@@ -148,7 +148,7 @@ def runParsec():
     targetFile = os.path.join(targetDir, 'blackscholes.tar.gz')
     downloadAndUnpack(benchmarkLocation, targetFile)
     
-    return runAndProcess("C:\\git\citest\\stability\\blackscholes\\blackscholes_cpp_serial 1 in_10M.txt prices.txt", parsecProcessResults)
+    return runAndProcess("%WORKSPACE%\\blackscholes_cpp_serial 1 in_10M.txt prices.txt", parsecProcessResults)
     
 # List of benchmarks to run
 benchmarkRunners = {'Parsec': runParsec}

@@ -11,6 +11,8 @@ def gitUrl = Utilities.calculateGitURL(project)
 def stabilityTestingFolderName = 'stability_testing'
 folder('stability_testing') {}
 
+
+
 // Defines stability testing for all linux OS's.  It might be possible to unify this into all unixes.
 // Can't use pipeline here.  The postbuild step that is used to launch the subsequent builds doesn't work
 // with the pipeline project type.  It might be possible to do this other ways.  For instance, evaluating all
@@ -30,9 +32,14 @@ folder('stability_testing') {}
                 description('Nodes label expression to run the unix stability job across')
             }
         }
+        wrappers {
+					credentialsBinding {
+						string('BV_UPLOAD_SAS_TOKEN', 'Stability Perf SAS Token')
+					}
+				}
         steps {
             if (osFamily == 'windows') {
-                batchFile('runPythonOnWindows.bat')
+                batchFile('stability\\runPythonOnWindows.bat')
             }
             else {
                 shell("stability/linux_native-stability-test.py")
