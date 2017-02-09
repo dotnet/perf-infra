@@ -1,4 +1,4 @@
-py stability\windows_native-stability-test.py --stabilization --iterations=10
+py %WORKSPACE%\stability\stability\windows_native-stability-test.py --stabilization --iterations=10
 For /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set mydate=%%c-%%a-%%b)
 py C:\Tools\Microsoft.BenchView.JSONFormat\tools\submission-metadata.py --name "%COMPUTERNAME% Stability Run %mydate%" --user-email "dotnet-bot@microsoft.com"
 py C:\Tools\Microsoft.BenchView.JSONFormat\tools\build.py git --type rolling

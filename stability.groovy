@@ -32,7 +32,7 @@ folder('stability_testing') {}
         }
         steps {
             if (osFamily == 'windows') {
-                batchFile('runPythonOnWindows.bat')
+                batchFile('stability\\runPythonOnWindows.bat')
             }
             else {
                 shell("stability/linux_native-stability-test.py")
