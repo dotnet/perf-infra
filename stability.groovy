@@ -39,6 +39,7 @@ folder('stability_testing') {}
 				}
         steps {
             if (osFamily == 'windows') {
+                batchFile("C:\\Tools\\nuget.exe install Microsoft.BenchView.JSONFormat -Source http://benchviewtestfeed.azurewebsites.net/nuget -OutputDirectory \"%WORKSPACE%\" -Prerelease -ExcludeVersion")
                 batchFile('stability\\runPythonOnWindows.bat')
             }
             else {
