@@ -85,12 +85,12 @@ def osShortName = ['Windows 10': 'win10',
                     "py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\submission-metadata.py\" --name \"${benchViewName}\" --user \"dotnet-bot@microsoft.com\"\n" +
                     "py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\build.py\" git --branch %GIT_BRANCH_WITHOUT_ORIGIN% --type ${runType}")
                     batchFile("py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\machinedata.py\"")
-                    batchFile("pushd JitBench_Timing")
-                    batchFile("py startup.py")
+                    batchFile("pushd JitBench_Timing\n" +
+                    "py startup.py")
                     batchFile("popd")
-                    batchFile("py C:\Tools\Microsoft.BenchView.JSONFormat\tools\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append startup.txt")
-                    batchFile("py C:\Tools\Microsoft.BenchView.JSONFormat\tools\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append request.txt")
-                    batchFile("py \"%BENCHVIEW_PATH%\submission.py\" measurement.json " +
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append startup.txt")
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append request.txt")
+                    batchFile("py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\submission.py\" measurement.json " +
                                     "--build build.json " +
                                     "--machine-data machinedata.json " +
                                     "--metadata submission-metadata.json " +
@@ -108,7 +108,7 @@ def osShortName = ['Windows 10': 'win10',
 
             // Set the label.
             newJob.with {
-                label('windows_clr_perf')
+                label('perfsnake15')
             }
             // Set up standard options.
             Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
