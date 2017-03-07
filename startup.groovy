@@ -75,15 +75,17 @@ def osShortName = ['Windows 10': 'win10',
                 
                 def configuration = 'Release'
                 def runType = isPR ? 'private' : 'rolling'
-                def benchViewName = isPR ? 'JitBenchStart private %BenchviewCommitName%' : 'JitBenchStart rolling %GIT_BRANCH_WITHOUT_ORIGIN% %GIT_COMMIT%'
-
+                def benchViewName = isPR ? 'JitBenchStart private %BenchviewCommitName%' : 'JitBenchStart rolling %mydate%-%mytime%'
+                
                 steps {
                     batchFile("C:\\Tools\\nuget.exe install Microsoft.BenchView.JSONFormat -Source http://benchviewtestfeed.azurewebsites.net/nuget -OutputDirectory \"%WORKSPACE%\" -Prerelease -ExcludeVersion")
                     //Do this here to remove the origin but at the front of the branch name as this is a problem for BenchView
                     //we have to do it all as one statement because cmd is called each time and we lose the set environment variable
-                    batchFile("if [%GIT_BRANCH:~0,7%] == [origin/] (set GIT_BRANCH_WITHOUT_ORIGIN=%GIT_BRANCH:origin/=%) else (set GIT_BRANCH_WITHOUT_ORIGIN=%GIT_BRANCH%)\n" +
-                    "py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\submission-metadata.py\" --name \"${benchViewName}\" --user \"dotnet-bot@microsoft.com\"\n" +
-                    "py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\build.py\" git --branch %GIT_BRANCH_WITHOUT_ORIGIN% --type ${runType}")
+                    batchFile("For /f \"tokens=2-4 delims=/ \" %%a in ('date /t') do (set mydate=%%c-%%a-%%b)\n"+
+                                "For /f \"tokens=1-2 delims=: \" %%a in ('time /t') do (set mytime=%%a:%%b)\n"+
+                                "set timestamp=%mydate%T%mytime%:00Z\n"+
+                                "py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\submission-metadata.py --name \"${benchViewName}\" --user-email \"dotnet-bot@microsoft.com\"\n"+
+                                "py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\build.py git --type rolling --branch master --number %mydate%-%mytime% --source-timestamp \"%timestamp%\"")
                     batchFile("py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\machinedata.py\"")
                     batchFile("pushd JitBench_Timing\n" +
                     "py startup.py")
