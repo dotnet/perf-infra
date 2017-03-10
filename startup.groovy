@@ -126,7 +126,7 @@ def osShortName = ['Windows 10': 'win10',
             }
             else {
                 // Set a daily trigger
-                Utilities.addPeriodicTrigger(newJob, '@daily')
+                Utilities.addPeriodicTrigger(newJob, '@daily', true)
             }
         }
     }
