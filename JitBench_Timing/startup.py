@@ -31,6 +31,9 @@ def parse_num_from_string (str):
 def parse_output (inFileName):
     startups = []
     requests = []
+    minSteadyState = []
+    maxSteadyState = []
+    avgSteadyState = []
 
     for line in open(inFileName, "r"):
         if line.startswith("Server started in"):
@@ -39,12 +42,28 @@ def parse_output (inFileName):
         elif line.startswith("Request took"):
             requestTime = parse_num_from_string(line)
             requests.append(requestTime)
+        elif line.startswith("Steadystate min response time"):
+            minTime = parse_num_from_string(line)
+            minSteadyState.append(minTime)
+        elif line.startswith("Steadystate max response time"):
+            maxTime = parse_num_from_string(line)
+            maxSteadyState.append(minTime)
+        elif line.startswith("Steadystate average response time"):
+            avgTime = parse_num_from_string(line)
+            avgSteadyState.append(minTime)
     
-    if len(startups) == 0 or len(requests) != len(startups):
+    if len(startups) == 0 or \
+            len(requests) != len(startups) or \
+            len(minSteadyState) != len(startups) or \
+            len(maxSteadyState) != len(startups) or \
+            len(avgSteadyState) != len(startups):
         error("Error parsing data, missing data detected") 
 
     create_csv_file(startups, "startup.txt", "JitBenchStartupTime")
     create_csv_file(requests, "request.txt", "JitBenchRequestTime")
+    create_csv_file(minSteadyState, "minSteadyState.txt", "JitBenchRequestMinimumSteadyStateTime")
+    create_csv_file(maxSteadyState, "maxSteadyState.txt", "JitBenchRequestMaximumSteadyStateTime")
+    create_csv_file(avgSteadyState, "avgSteadyState.txt", "JitBenchRequestAverageSteadyStateTime")
 
 def copy_file(curName, newName):
     print("moving {} to {}".format(curName, newName))
