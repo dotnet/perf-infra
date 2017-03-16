@@ -56,10 +56,10 @@ def parse_output (inFileName):
             minSteadyState.append(minTime)
         elif line.startswith('Steadystate max response time'):
             maxTime = parse_num_from_string(line)
-            maxSteadyState.append(minTime)
+            maxSteadyState.append(maxTime)
         elif line.startswith('Steadystate average response time'):
             avgTime = parse_num_from_string(line)
-            avgSteadyState.append(minTime)
+            avgSteadyState.append(avgTime)
     
     if len(startups) == 0 or \
             len(requests) != len(startups) or \
@@ -152,6 +152,7 @@ def prepare_jitbench(config):
     # Modify shared runtime with local built copy
     sharedRuntimeDir = os.path.join(jitBenchDir, '.dotnet', 'shared', 'Microsoft.NETCore.App')
     patched = False
+    crossgenPath = ''
     for item in os.listdir(sharedRuntimeDir):
         targetRuntimeDir = os.path.join(sharedRuntimeDir, item)
         print('considering item {}'.format(targetRuntimeDir))
@@ -159,6 +160,7 @@ def prepare_jitbench(config):
             print('patching shared runtime dir {} with {}'.format(targetRuntimeDir, config['CoreCLRBinPath']))
             patch_coreclr_files(config['CoreCLRBinPath'], targetRuntimeDir)
             patched = True
+            crossgenPath = os.path.join(targetRuntimeDir, 'crossgen.exe')
 
     if not patched:
         error('did not find a dotnet version to patch')
@@ -169,7 +171,7 @@ def prepare_jitbench(config):
     os.chdir(os.path.join('bin', 'Release', 'netcoreapp20', 'publish'))
 
     # Crossgen all the framework assemblies
-    run_command('powershell .\\Invoke-Crossgen.ps1')
+    run_command('powershell .\\Invoke-Crossgen.ps1 -crossgen_path {}'.format(crossgenPath))
     
     os.chdir(startDir)
 
