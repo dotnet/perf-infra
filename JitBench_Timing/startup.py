@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil 
 import argparse
 
 def error(message, exitCode = 1):
@@ -74,11 +75,11 @@ def parse_output (inFileName):
     create_csv_file(avgSteadyState, 'avgSteadyState.txt', 'JitBenchRequestAverageSteadyStateTime')
 
 def copy_file(curName, newName):
-    print('moving {} to {}'.format(curName, newName))
+    print('copying {} to {}'.format(curName, newName))
     if os.path.isfile(newName):
         os.remove(newName)
     
-    os.rename(curName, newName)
+    shutil.copyfile(curName, newName)
 
 def patch_coreclr_files(coreClrBinPath, sharedRuntime):
     for item in os.listdir(coreClrBinPath):
