@@ -137,7 +137,7 @@ def prepare_jitbench(config):
     # TODO: ability to change architecture
     archStr = config['Arch']
     run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
-    run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Architecture {}'.format(archStr))
+    run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
     
     # Add new dotnet to path
     os.environ['PATH'] = os.path.join(os.getcwd(), '.dotnet') + os.pathsep + os.environ['PATH']
