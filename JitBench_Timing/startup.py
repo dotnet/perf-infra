@@ -81,6 +81,10 @@ def copy_file(curName, newName):
     
     shutil.copyfile(curName, newName)
 
+def copy_folder(curPath, newParent):
+    print ('copying folder {} inside target folder {}'.format(curPath, newParent))
+    shutil.move(curPath, newParent)
+
 def patch_coreclr_files(coreClrBinPath, sharedRuntime):
     for item in os.listdir(coreClrBinPath):
         fullPath = os.path.join(coreClrBinPath, item)
@@ -168,7 +172,13 @@ def prepare_jitbench(config):
     # publish the App
     run_command('dotnet publish -c Release -f netcoreapp20')
 
-    os.chdir(os.path.join('bin', 'Release', 'netcoreapp20', 'publish'))
+    publishPath = os.path.join('bin', 'Release', 'netcoreapp20', 'publish')
+    
+    # There is an issue with the lab machines where we were going over the 260 character
+    # path limit. We can avoid that by moving the publish folder to the root of the
+    # workspace
+    copy_folder(publishPath, startDir)
+    os.chdir(os.path.join(startDir, 'publish'))
 
     # Crossgen all the framework assemblies
     run_command('powershell .\\Invoke-Crossgen.ps1 -crossgen_path {}'.format(crossgenPath))
@@ -179,7 +189,7 @@ def prepare_jitbench(config):
 def run_jitbench(config):
     startDir = os.getcwd()
 
-    targetDir = os.path.join('JitBench', 'src', 'MusicStore', 'bin', 'Release', 'netcoreapp20', 'publish')
+    targetDir = os.path.join(startDir, 'publish')
     os.chdir(targetDir)
 
     targetCommand = 'dotnet MusicStore.dll' 
