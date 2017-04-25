@@ -107,7 +107,7 @@ def prepare_coreclr(config):
     if osStr == 'Windows_NT':
         run_command('cmd.exe /c build.cmd release {} skiptests'.format(archStr))
     else:
-        run_command('/bin/bash -c build.sh release {} skiptests'.format(archStr))
+        run_command('./build.sh release {} skiptests'.format(archStr))
 
     productIdentifier = '{}.{}.Release'.format(osStr, archStr)
     coreClrOutPath = os.path.join('bin', 'Product', productIdentifier)
@@ -136,9 +136,15 @@ def prepare_jitbench(config):
     # Get the latest shared runtime and SDK
     # TODO: ability to change architecture
     archStr = config['Arch']
-    run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
-    run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+    osStr = config['OS']
     
+    if osStr == 'Windows_NT':
+        run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+        run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+    else:
+        run_command('./dotnet-install.sh -sharedruntime -installdir .dotnet -channel master -architecture {}'.format(archStr))
+        run_command('./dotnet-install.sh -installdir .dotnet -channel master -architecture {}'.format(archStr))
+      
     # Add new dotnet to path
     os.environ['PATH'] = os.path.join(os.getcwd(), '.dotnet') + os.pathsep + os.environ['PATH']
     
@@ -159,7 +165,11 @@ def prepare_jitbench(config):
         error('did not find a dotnet version to patch')
 
     # Install crossgened assemblies
-    run_command('powershell .\AspNet-Install.ps1 -InstallDir .aspnet -Architecture {}'.format(archStr))
+    if osStr == 'Windows_NT':
+        run_command('powershell .\AspNet-Install.ps1 -InstallDir .aspnet -Architecture {}'.format(archStr))
+    else:
+        # TODO: right now the runtime param is built in. Need to fix that.
+        run_command('./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
 
     os.chdir(os.path.join('src', 'MusicStore'))
 
