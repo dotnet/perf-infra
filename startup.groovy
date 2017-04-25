@@ -113,7 +113,7 @@ def osShortName = ['Windows 10': 'win10',
 
             // Set the label.
             newJob.with {
-                label('perfsnake15')
+                label('windows_clr_perf')
             }
             // Set up standard options.
             Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
