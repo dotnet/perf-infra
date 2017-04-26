@@ -8,7 +8,7 @@ def error(message, exitCode = 1):
     sys.exit(exitCode)
 
 def run_command(cmd, outputFile=None):
-    print('running command \'{}\''.format(cmd))
+    print('running command \'{}\' in directory \'{}\''.format(cmd, os.getcwd()))
     if outputFile is None:
         return os.system(cmd)
     else:
@@ -81,10 +81,6 @@ def copy_file(curName, newName):
     
     shutil.copyfile(curName, newName)
 
-def copy_folder(curPath, newParent):
-    print ('copying folder {} inside target folder {}'.format(curPath, newParent))
-    shutil.move(curPath, newParent)
-
 def patch_coreclr_files(coreClrBinPath, sharedRuntime):
     for item in os.listdir(coreClrBinPath):
         fullPath = os.path.join(coreClrBinPath, item)
@@ -111,7 +107,7 @@ def prepare_coreclr(config):
     if osStr == 'Windows_NT':
         run_command('cmd.exe /c build.cmd release {} skiptests'.format(archStr))
     else:
-        run_command('/bin/bash -c build.sh release {} skiptests'.format(archStr))
+        run_command('./build.sh release {} skiptests'.format(archStr))
 
     productIdentifier = '{}.{}.Release'.format(osStr, archStr)
     coreClrOutPath = os.path.join('bin', 'Product', productIdentifier)
@@ -140,23 +136,23 @@ def prepare_jitbench(config):
     # Get the latest shared runtime and SDK
     # TODO: ability to change architecture
     archStr = config['Arch']
-    run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
-    run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+    osStr = config['OS']
     
+    if osStr == 'Windows_NT':
+        run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+        run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+    else:
+        run_command('./dotnet-install.sh -sharedruntime -installdir .dotnet -channel master -architecture {}'.format(archStr))
+        run_command('./dotnet-install.sh -installdir .dotnet -channel master -architecture {}'.format(archStr))
+      
     # Add new dotnet to path
     os.environ['PATH'] = os.path.join(os.getcwd(), '.dotnet') + os.pathsep + os.environ['PATH']
     
     run_command('dotnet --info')
 
-    os.chdir(os.path.join('src', 'MusicStore'))
-
-    # Restore the MusicStore project
-    run_command('dotnet restore')
-
     # Modify shared runtime with local built copy
     sharedRuntimeDir = os.path.join(jitBenchDir, '.dotnet', 'shared', 'Microsoft.NETCore.App')
     patched = False
-    crossgenPath = ''
     for item in os.listdir(sharedRuntimeDir):
         targetRuntimeDir = os.path.join(sharedRuntimeDir, item)
         print('considering item {}'.format(targetRuntimeDir))
@@ -164,24 +160,26 @@ def prepare_jitbench(config):
             print('patching shared runtime dir {} with {}'.format(targetRuntimeDir, config['CoreCLRBinPath']))
             patch_coreclr_files(config['CoreCLRBinPath'], targetRuntimeDir)
             patched = True
-            crossgenPath = os.path.join(targetRuntimeDir, 'crossgen.exe')
 
     if not patched:
         error('did not find a dotnet version to patch')
+
+    # Install crossgened assemblies
+    if osStr == 'Windows_NT':
+        run_command('powershell .\AspNet-Install.ps1 -InstallDir .aspnet -Architecture {}'.format(archStr))
+    else:
+        # TODO: right now the runtime param is built in. Need to fix that.
+        run_command('./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
+
+    os.chdir(os.path.join('src', 'MusicStore'))
+
+    # Restore the MusicStore project
+    run_command('dotnet restore')
 
     # publish the App
     run_command('dotnet publish -c Release -f netcoreapp20')
 
     publishPath = os.path.join('bin', 'Release', 'netcoreapp20', 'publish')
-    
-    # There is an issue with the lab machines where we were going over the 260 character
-    # path limit. We can avoid that by moving the publish folder to the root of the
-    # workspace
-    copy_folder(publishPath, startDir)
-    os.chdir(os.path.join(startDir, 'publish'))
-
-    # Crossgen all the framework assemblies
-    run_command('powershell .\\Invoke-Crossgen.ps1 -crossgen_path {}'.format(crossgenPath))
     
     os.chdir(startDir)
 
@@ -189,7 +187,7 @@ def prepare_jitbench(config):
 def run_jitbench(config):
     startDir = os.getcwd()
 
-    targetDir = os.path.join(startDir, 'publish')
+    targetDir = os.path.join('JitBench', 'src', 'MusicStore', 'bin', 'Release', 'netcoreapp20', 'publish')
     os.chdir(targetDir)
 
     targetCommand = 'dotnet MusicStore.dll' 
