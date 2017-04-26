@@ -2,17 +2,29 @@ import sys
 import os
 import shutil 
 import argparse
+import subprocess
 
 def error(message, exitCode = 1):
     print(message)
     sys.exit(exitCode)
 
-def run_command(cmd, outputFile=None):
-    print('running command \'{}\' in directory \'{}\''.format(cmd, os.getcwd()))
-    if outputFile is None:
-        return os.system(cmd)
+def run_command(cmd, outputFilePath = None, append = True):
+    expandedCmd = os.path.expandvars(cmd)
+    print('running command \'{}\' in directory \'{}\''.format(expandedCmd, os.getcwd()))
+    if outputFilePath is None:
+        return os.system(expandedCmd)
     else:
-        return os.system(cmd + ' >> ' + outputFile)
+        # Write to file and Console
+        if append:
+            outputFile = open(outputFilePath, 'a')
+        else:
+            outputFile = open(outputFilePath, 'w')
+        outProc = subprocess.Popen(expandedCmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+        for line in outProc.stdout:
+            sys.stdout.write(line)
+            outputFile.write(line)
+        outProc.wait()
+        return outProc.returncode
 
 def create_csv_file(data, name, benchmarkTitle):
     if os.path.isfile(name):
@@ -37,7 +49,7 @@ def parse_num_from_string (str):
     
     return -1
 
-def parse_output (inFileName):
+def parse_output (inFileName, iters):
     startups = []
     requests = []
     minSteadyState = []
@@ -61,12 +73,18 @@ def parse_output (inFileName):
             avgTime = parse_num_from_string(line)
             avgSteadyState.append(avgTime)
     
-    if len(startups) == 0 or \
-            len(requests) != len(startups) or \
-            len(minSteadyState) != len(startups) or \
-            len(maxSteadyState) != len(startups) or \
-            len(avgSteadyState) != len(startups):
-        error('Error parsing data, missing data detected') 
+    if len(startups) == 0:
+        error('No data detected, startups count = 0')
+    if len(startups) != iters:
+        error('startups count = {}, expected {}'.format(len(startups), iters))
+    if len(requests) != len(startups):
+        error('requests count = {}, expected {}'.format(len(requests), len(startups)))
+    if len(minSteadyState) != len(startups):
+        error('minSteadyState count = {}, expected {}'.format(len(minSteadyState), len(startups)))
+    if len(maxSteadyState) != len(startups):
+        error('maxSteadyState count = {}, expected {}'.format(len(maxSteadyState), len(startups)))
+    if len(avgSteadyState) != len(startups):
+        error('avgSteadyState count = {}, expected {}'.format(len(avgSteadyState), len(startups))) 
 
     create_csv_file(startups, 'startup.txt', 'JitBenchStartupTime')
     create_csv_file(requests, 'request.txt', 'JitBenchRequestTime')
@@ -143,7 +161,7 @@ def prepare_jitbench(config):
         run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
     else:
         run_command('./dotnet-install.sh -sharedruntime -installdir .dotnet -channel master -architecture {}'.format(archStr))
-        run_command('./dotnet-install.sh -installdir .dotnet -channel master -architecture {}'.format(archStr))
+        run_command('source ./dotnet-install.sh -installdir .dotnet -channel master -architecture {}'.format(archStr))
       
     # Add new dotnet to path
     os.environ['PATH'] = os.path.join(os.getcwd(), '.dotnet') + os.pathsep + os.environ['PATH']
@@ -165,11 +183,34 @@ def prepare_jitbench(config):
         error('did not find a dotnet version to patch')
 
     # Install crossgened assemblies
+    # TODO: right now the runtime param is built in. Need to fix that.
     if osStr == 'Windows_NT':
-        run_command('powershell .\AspNet-Install.ps1 -InstallDir .aspnet -Architecture {}'.format(archStr))
+        outFileName = 'aspnetinstall.txt'
+        run_command('powershell .\\AspNet-Install.ps1 -InstallDir .aspnet -Architecture {}'.format(archStr), outFileName)
+        
+        aspnetVersion = ''
+        frameworkVersion = ''
+        aspnetManifest = ''
+        sharedStore = ''
+        # In the usual case these would be set by the script, but we need to 
+        # set them manually since sub scripts don't impact our environment like
+        # it would in powershell
+        for line in open(outFileName, 'r'):
+            if line.startswith('Setting JITBENCH_ASPNET_VERSION to '):
+                aspnetVersion = line[35:].rstrip()
+                os.environ['JITBENCH_ASPNET_VERSION'] = aspnetVersion
+            elif line.startswith('Setting JITBENCH_FRAMEWORK_VERSION to '):
+                frameworkVersion = line[38:].rstrip()
+                os.environ['JITBENCH_FRAMEWORK_VERSION'] = frameworkVersion
+            elif line.startswith('Setting JITBENCH_ASPNET_MANIFEST to '):
+                aspnetManifest = line[36:].rstrip()
+                os.environ['JITBENCH_ASPNET_MANIFEST'] = aspnetManifest
+            elif line.startswith('Setting DOTNET_SHARED_STORE to '):
+                sharedStore = line[31:].rstrip()
+                os.environ['DOTNET_SHARED_STORE'] = sharedStore
+        
     else:
-        # TODO: right now the runtime param is built in. Need to fix that.
-        run_command('./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
+        run_command('source ./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
 
     os.chdir(os.path.join('src', 'MusicStore'))
 
@@ -177,9 +218,12 @@ def prepare_jitbench(config):
     run_command('dotnet restore')
 
     # publish the App
-    run_command('dotnet publish -c Release -f netcoreapp20')
+    if osStr == 'Windows_NT':
+        run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest %JITBENCH_ASPNET_MANIFEST%')
+    else:
+        run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest $JITBENCH_ASPNET_MANIFEST')
 
-    publishPath = os.path.join('bin', 'Release', 'netcoreapp20', 'publish')
+    publishPath = os.path.join('bin', 'Release', 'netcoreapp2.0', 'publish')
     
     os.chdir(startDir)
 
@@ -187,7 +231,7 @@ def prepare_jitbench(config):
 def run_jitbench(config):
     startDir = os.getcwd()
 
-    targetDir = os.path.join('JitBench', 'src', 'MusicStore', 'bin', 'Release', 'netcoreapp20', 'publish')
+    targetDir = os.path.join('JitBench', 'src', 'MusicStore', 'bin', 'Release', 'netcoreapp2.0', 'publish')
     os.chdir(targetDir)
 
     targetCommand = 'dotnet MusicStore.dll' 
@@ -196,16 +240,22 @@ def run_jitbench(config):
     if run_command(targetCommand) != 0:
         error('Running MusicStore failed')
 
-    for i in range(0, 100):
-        if run_command(targetCommand, 'output.txt') != 0:
+    # Delete existing results if there are any
+    outputFilePath = 'output.txt'
+    if os.path.isfile(outputFilePath):
+        os.remove(outputFilePath)
+
+    iterations = 100
+    for i in range(0, iterations):
+        if run_command(targetCommand, outputFilePath) != 0:
             error('Running MusicStore failed')
 
-    curName = os.path.join(os.getcwd(), 'output.txt')
-    newName = os.path.join(startDir, 'output.txt')
+    curName = os.path.join(os.getcwd(), outputFilePath)
+    newName = os.path.join(startDir, outputFilePath)
     copy_file(curName, newName)
 
     os.chdir(startDir)
-    return newName
+    return newName, iterations
 
 def parse_config():
     workingDir = os.environ['WORKSPACE']
@@ -264,6 +314,6 @@ if __name__ == '__main__':
         error('CoreCLR bin path {} does not exist'.format(coreClrBinPath))
 
     prepare_jitbench(config)
-    fileName = run_jitbench(config)
-    parse_output(fileName)
+    fileName, iters = run_jitbench(config)
+    parse_output(fileName, iters)
     sys.exit(0)
