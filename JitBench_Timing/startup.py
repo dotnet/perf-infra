@@ -209,6 +209,14 @@ def prepare_jitbench(config):
                 sharedStore = line[31:].rstrip()
                 os.environ['DOTNET_SHARED_STORE'] = sharedStore
         
+        if aspnetVersion is None or aspnetVersion.isspace():
+            error('Missing asp.net version from script output')
+        if frameworkVersion is None or frameworkVersion.isspace():
+            error('Missing framework version from script output')
+        if aspnetManifest is None or aspnetManifest.isspace():
+            error('Missing asp.net manifest from script output')
+        if sharedStore is None or sharedStore.isspace():
+            error('Missing shared store from script output')
     else:
         run_command('source ./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
 
