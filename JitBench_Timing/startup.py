@@ -299,15 +299,18 @@ if __name__ == '__main__':
     workingDir = config['Workspace']
 
     if not os.path.isdir(workingDir):
-        os.mkdir(workingDir)
+        os.makedirs(workingDir)
 
-    os.chdir(workingDir)
+    absolutePath = os.path.abspath(workingDir)
+    run_command('subst X: {}'.format(absolutePath))
+    remappedDir = 'X:\\'
+    os.chdir(remappedDir)
 
     coreClrBinPath = config['CoreCLRBinPath'];
     if not coreClrBinPath or coreClrBinPath.isspace():
         prepare_coreclr(config)
         productIdentifier = '{}.{}.Release'.format(config['OS'], config['Arch'])
-        coreClrBinPath = os.path.join(workingDir, 'coreclr', 'bin', 'Product', productIdentifier)
+        coreClrBinPath = os.path.join(remappedDir, 'coreclr', 'bin', 'Product', productIdentifier)
         config['CoreCLRBinPath'] = coreClrBinPath
     
     if not os.path.isdir(coreClrBinPath):
@@ -316,4 +319,6 @@ if __name__ == '__main__':
     prepare_jitbench(config)
     fileName, iters = run_jitbench(config)
     parse_output(fileName, iters)
+
+    run_command("subst X: /D")
     sys.exit(0)
