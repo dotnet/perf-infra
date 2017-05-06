@@ -72,6 +72,8 @@ def parse_output (inFileName, iters):
         elif line.startswith('Steadystate average response time'):
             avgTime = parse_num_from_string(line)
             avgSteadyState.append(avgTime)
+        elif line.startswith('ASP.NET loaded from bin. This is a bug if you wanted crossgen'):
+            error(line)
     
     if len(startups) == 0:
         error('No data detected, startups count = 0')
@@ -217,6 +219,12 @@ def prepare_jitbench(config):
             error('Missing asp.net manifest from script output')
         if sharedStore is None or sharedStore.isspace():
             error('Missing shared store from script output')
+
+        print('aspnet version = {}'.format(aspnetVersion))
+        print('framework version = {}'.format(frameworkVersion))
+        print('aspnet manifest = {}'.format(aspnetManifest))
+        print('shared store = {}'.format(sharedStore))
+        
     else:
         run_command('source ./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
 
