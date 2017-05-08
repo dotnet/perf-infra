@@ -188,8 +188,8 @@ def prepare_jitbench(config):
     # TODO: right now the runtime param is built in. Need to fix that.
     if osStr == 'Windows_NT':
         outFileName = 'aspnetinstall.txt'
-        run_command('powershell .\\AspNet-Install.ps1 -InstallDir .aspnet -Architecture {}'.format(archStr), outFileName)
-        
+        run_command('powershell .\AspNet-GenerateStore.ps1 -InstallDir .store -Architecture {} -Runtime win7-x64'.format(archStr), outFileName)
+
         aspnetVersion = ''
         frameworkVersion = ''
         aspnetManifest = ''
