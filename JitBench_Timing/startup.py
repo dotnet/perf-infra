@@ -6,6 +6,7 @@ import subprocess
 
 def error(message, exitCode = 1):
     print(message)
+    run_command('subst X: /D')
     sys.exit(exitCode)
 
 def run_command(cmd, outputFilePath = None, append = True):
