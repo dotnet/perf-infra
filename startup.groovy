@@ -128,8 +128,8 @@ def osShortName = ['Windows 10': 'win10',
                 builder.emitTrigger(newJob)
             }
             else {
-                // Set a daily trigger
-                Utilities.addPeriodicTrigger(newJob, '@daily', true)
+                // Set a trigger that will fire every 6th hour
+                Utilities.addPeriodicTrigger(newJob, '00 */6 * * *', true)
             }
         }
     }
