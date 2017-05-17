@@ -95,6 +95,11 @@ def osShortName = ['Windows 10': 'win10',
                     batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append avgSteadyState.txt")
                     batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append maxSteadyState.txt")
                     batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append minSteadyState.txt")
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append startup_TieredCompilation.txt")
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append request_TieredCompilation.txt")
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append avgSteadyState_TieredCompilation.txt")
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append maxSteadyState_TieredCompilation.txt")
+                    batchFile("py %WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\measurement.py csv -m \"Duration\" -u \"ms\" --better desc --drop-first-value --append minSteadyState_TieredCompilation.txt")
                     batchFile("py \"%WORKSPACE%\\Microsoft.BenchView.JSONFormat\\tools\\submission.py\" measurement.json " +
                                     "--build build.json " +
                                     "--machine-data machinedata.json " +
