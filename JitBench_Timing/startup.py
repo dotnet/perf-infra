@@ -148,7 +148,7 @@ def prepare_jitbench(config):
             run_command('git pull')
             os.chdir(startDir)
         else:
-            run_command('git clone -b dev https://github.com/davmason/JitBench')
+            run_command('git clone -b rel/2.0.0-preview1 https://github.com/davmason/JitBench')
 
     if not os.path.isdir(jitBenchDir):
         error('JitBench folder does not exist')
