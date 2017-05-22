@@ -346,7 +346,7 @@ if __name__ == '__main__':
 
     prepare_jitbench(config)
     tieredFileName, iters = run_jitbench(config, True)
-    parse_output(tieredFileName, iters, '_TieredCompiliation')
+    parse_output(tieredFileName, iters, '_TieredCompilation')
     fileName, iters = run_jitbench(config, False)
     parse_output(fileName, iters, '')
 
