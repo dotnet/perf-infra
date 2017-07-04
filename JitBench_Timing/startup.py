@@ -13,7 +13,7 @@ def run_command(cmd, outputFilePath = None, append = True):
     expandedCmd = os.path.expandvars(cmd)
     print('running command \'{}\' in directory \'{}\''.format(expandedCmd, os.getcwd()))
     if outputFilePath is None:
-        return os.system(expandedCmd)
+        returnCode = os.system(expandedCmd)
     else:
         # Write to file and Console
         if append:
@@ -25,7 +25,12 @@ def run_command(cmd, outputFilePath = None, append = True):
             sys.stdout.write(line)
             outputFile.write(line)
         outProc.wait()
-        return outProc.returncode
+        returnCode = outProc.returncode
+    
+    if returnCode != 0:
+        error('Command failed with non-zero return code {}'.format(returnCode))
+    
+    return returnCode
 
 def create_csv_file(data, name, benchmarkTitle):
     if os.path.isfile(name):
@@ -142,110 +147,124 @@ def prepare_jitbench(config):
     startDir = os.getcwd()
     jitBenchDir = os.path.join(startDir, 'JitBench')
 
-    if config['SetupJitBench']:
-        if os.path.isdir(jitBenchDir):
-            os.chdir(jitBenchDir)
-            run_command('git pull')
-            os.chdir(startDir)
-        else:
-            run_command('git clone -b rel/2.0.0-preview1 https://github.com/davmason/JitBench')
+    if os.path.isdir(jitBenchDir):
+        os.chdir(jitBenchDir)
+        run_command('git pull')
+        os.chdir(startDir)
+    else:
+        branch = config['Branch']
+        run_command('git clone -b {} https://github.com/aspnet/JitBench'.format(branch))
 
     if not os.path.isdir(jitBenchDir):
         error('JitBench folder does not exist')
 
     os.chdir(jitBenchDir)
 
-    if config['SetupJitBench']:
-        # Get the latest shared runtime and SDK
-        # TODO: ability to change architecture
-        archStr = config['Arch']
-        osStr = config['OS']
-    
-        if osStr == 'Windows_NT':
-            run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
-            run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
-        else:
-            run_command('./dotnet-install.sh -sharedruntime -installdir .dotnet -channel master -architecture {}'.format(archStr))
-            run_command('source ./dotnet-install.sh -installdir .dotnet -channel master -architecture {}'.format(archStr))
+    # Get the latest shared runtime and SDK
+    # TODO: ability to change architecture
+    osStr, archStr = initialize_jitbench_folder(config)
       
     # Add new dotnet to path
     os.environ['PATH'] = os.path.join(os.getcwd(), '.dotnet') + os.pathsep + os.environ['PATH']
     
     run_command('dotnet --info')
 
-    if config['SetupJitBench']:
-        # Modify shared runtime with local built copy
-        sharedRuntimeDir = os.path.join(jitBenchDir, '.dotnet', 'shared', 'Microsoft.NETCore.App')
-        patched = False
-        for item in os.listdir(sharedRuntimeDir):
-            targetRuntimeDir = os.path.join(sharedRuntimeDir, item)
-            print('considering item {}'.format(targetRuntimeDir))
-            if os.path.isdir(targetRuntimeDir) and item.startswith('2.0'):
-                print('patching shared runtime dir {} with {}'.format(targetRuntimeDir, config['CoreCLRBinPath']))
-                patch_coreclr_files(config['CoreCLRBinPath'], targetRuntimeDir)
-                patched = True
+    # Modify shared runtime with local built copy
+    if config['CLRSetup']:
+        patch_runtime(jitBenchDir, config)
 
-        if not patched:
-            error('did not find a dotnet version to patch')
+    install_crossgened_assemblies(osStr, archStr)
 
-        # Install crossgened assemblies
-        # TODO: right now the runtime param is built in. Need to fix that.
-        if osStr == 'Windows_NT':
-            outFileName = 'aspnetinstall.txt'
-            run_command('powershell .\AspNet-GenerateStore.ps1 -InstallDir .store -Architecture {} -Runtime win7-x64'.format(archStr), outFileName)
+    os.chdir(os.path.join('src', 'MusicStore'))
 
-            aspnetVersion = ''
-            frameworkVersion = ''
-            aspnetManifest = ''
-            sharedStore = ''
-            # In the usual case these would be set by the script, but we need to 
-            # set them manually since sub scripts don't impact our environment like
-            # it would in powershell
-            for line in open(outFileName, 'r'):
-                if line.startswith('Setting JITBENCH_ASPNET_VERSION to '):
-                    aspnetVersion = line[35:].rstrip()
-                    os.environ['JITBENCH_ASPNET_VERSION'] = aspnetVersion
-                elif line.startswith('Setting JITBENCH_FRAMEWORK_VERSION to '):
-                    frameworkVersion = line[38:].rstrip()
-                    os.environ['JITBENCH_FRAMEWORK_VERSION'] = frameworkVersion
-                elif line.startswith('Setting JITBENCH_ASPNET_MANIFEST to '):
-                    aspnetManifest = line[36:].rstrip()
-                    os.environ['JITBENCH_ASPNET_MANIFEST'] = aspnetManifest
-                elif line.startswith('Setting DOTNET_SHARED_STORE to '):
-                    sharedStore = line[31:].rstrip()
-                    os.environ['DOTNET_SHARED_STORE'] = sharedStore
-            
-            if aspnetVersion is None or aspnetVersion.isspace():
-                error('Missing asp.net version from script output')
-            if frameworkVersion is None or frameworkVersion.isspace():
-                error('Missing framework version from script output')
-            if aspnetManifest is None or aspnetManifest.isspace():
-                error('Missing asp.net manifest from script output')
-            if sharedStore is None or sharedStore.isspace():
-                error('Missing shared store from script output')
+    # Restore the MusicStore project
+    run_command('dotnet restore')
 
-            print('aspnet version = {}'.format(aspnetVersion))
-            print('framework version = {}'.format(frameworkVersion))
-            print('aspnet manifest = {}'.format(aspnetManifest))
-            print('shared store = {}'.format(sharedStore))
-            
-        else:
-            run_command('source ./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
+    # publish the App
+    if osStr == 'Windows_NT':
+        run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest %JITBENCH_ASPNET_MANIFEST%')
+    else:
+        run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest $JITBENCH_ASPNET_MANIFEST')
 
-        os.chdir(os.path.join('src', 'MusicStore'))
-
-        # Restore the MusicStore project
-        run_command('dotnet restore')
-
-        # publish the App
-        if osStr == 'Windows_NT':
-            run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest %JITBENCH_ASPNET_MANIFEST%')
-        else:
-            run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest $JITBENCH_ASPNET_MANIFEST')
-
-        publishPath = os.path.join('bin', 'Release', 'netcoreapp2.0', 'publish')
+    publishPath = os.path.join('bin', 'Release', 'netcoreapp2.0', 'publish')
     
     os.chdir(startDir)
+
+def install_crossgened_assemblies(osStr, archStr):
+    # Install crossgened assemblies
+    # TODO: right now the runtime param is built in. Need to fix that.
+    if osStr == 'Windows_NT':
+        outFileName = 'aspnetinstall.txt'        
+        if config['RunCrossgen']:
+            run_command('powershell .\AspNet-GenerateStore.ps1 -InstallDir .store -Architecture {} -Runtime win7-x64'.format(archStr), outFileName)
+
+        aspnetVersion = ''
+        frameworkVersion = ''
+        aspnetManifest = ''
+        sharedStore = ''
+        # In the usual case these would be set by the script, but we need to 
+        # set them manually since sub scripts don't impact our environment like
+        # it would in powershell
+        for line in open(outFileName, 'r'):
+            if line.startswith('Setting JITBENCH_ASPNET_VERSION to '):
+                aspnetVersion = line[35:].rstrip()
+                os.environ['JITBENCH_ASPNET_VERSION'] = aspnetVersion
+            elif line.startswith('Setting JITBENCH_FRAMEWORK_VERSION to '):
+                frameworkVersion = line[38:].rstrip()
+                os.environ['JITBENCH_FRAMEWORK_VERSION'] = frameworkVersion
+            elif line.startswith('Setting JITBENCH_ASPNET_MANIFEST to '):
+                aspnetManifest = line[36:].rstrip()
+                os.environ['JITBENCH_ASPNET_MANIFEST'] = aspnetManifest
+            elif line.startswith('Setting DOTNET_SHARED_STORE to '):
+                sharedStore = line[31:].rstrip()
+                os.environ['DOTNET_SHARED_STORE'] = sharedStore
+
+        if aspnetVersion is None or aspnetVersion.isspace():
+            error('Missing asp.net version from script output')
+        if frameworkVersion is None or frameworkVersion.isspace():
+            error('Missing framework version from script output')
+        if aspnetManifest is None or aspnetManifest.isspace():
+            error('Missing asp.net manifest from script output')
+        if sharedStore is None or sharedStore.isspace():
+            error('Missing shared store from script output')
+
+        print('aspnet version = {}'.format(aspnetVersion))
+        print('framework version = {}'.format(frameworkVersion))
+        print('aspnet manifest = {}'.format(aspnetManifest))
+        print('shared store = {}'.format(sharedStore))
+
+    else:
+        if config['RunCrossgen']:
+            run_command('source ./aspnet-generatestore.sh -i .store --arch {} -r {}'.format(archStr, 'ubuntu.14.04-x64'))
+
+def initialize_jitbench_folder(config):
+    # Get the latest shared runtime and SDK
+    # TODO: ability to change architecture
+    archStr = config['Arch']
+    osStr = config['OS']
+
+    if osStr == 'Windows_NT':
+        run_command('powershell .\\Dotnet-Install.ps1 -SharedRuntime -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+        run_command('powershell .\\Dotnet-Install.ps1 -InstallDir .dotnet -Channel master -Architecture {}'.format(archStr))
+    else:
+        run_command('./dotnet-install.sh -sharedruntime -installdir .dotnet -channel master -architecture {}'.format(archStr))
+        run_command('source ./dotnet-install.sh -installdir .dotnet -channel master -architecture {}'.format(archStr))
+    
+    return osStr, archStr
+
+def patch_runtime(jitBenchDir, config):
+    sharedRuntimeDir = os.path.join(jitBenchDir, '.dotnet', 'shared', 'Microsoft.NETCore.App')
+    patched = False
+    for item in os.listdir(sharedRuntimeDir):
+        targetRuntimeDir = os.path.join(sharedRuntimeDir, item)
+
+        if os.path.isdir(targetRuntimeDir):
+            print('patching shared runtime dir {} with {}'.format(targetRuntimeDir, config['CoreCLRBinPath']))
+            patch_coreclr_files(config['CoreCLRBinPath'], targetRuntimeDir)
+            patched = True
+
+    if not patched:
+        error('did not find a dotnet version to patch')
 
 
 def run_jitbench(config, tiered):
@@ -262,8 +281,7 @@ def run_jitbench(config, tiered):
         os.environ['COMPLUS_EXPERIMENTAL_TieredCompilation']='0'
 
     # Warmup the scenario
-    if run_command(targetCommand) != 0:
-        error('Running MusicStore failed')
+    run_iteration(targetCommand, None)
 
     # Delete existing results if there are any
     outputFilePath = 'output_tiered.txt' if tiered else 'output.txt'
@@ -272,8 +290,7 @@ def run_jitbench(config, tiered):
 
     iterations = 100
     for i in range(0, iterations):
-        if run_command(targetCommand, outputFilePath) != 0:
-            error('Running MusicStore failed')
+        run_iteration(targetCommand, outputFilePath)
 
     curName = os.path.join(os.getcwd(), outputFilePath)
     newName = os.path.join(startDir, outputFilePath)
@@ -282,16 +299,34 @@ def run_jitbench(config, tiered):
     os.chdir(startDir)
     return newName, iterations
 
+def run_iteration(targetCommand, outputFile):
+    errorCode = run_command(targetCommand, outputFile)
+    if errorCode != 0:
+        error('Running MusicStore failed with error {}'.format(errorCode))
+
 def parse_config():
     workingDir = os.environ['WORKSPACE']
-    config = { 'Arch': 'x64', 'OS': 'Windows_NT', 'CoreCLRBinPath': '', 'Workspace': workingDir, 'LocalRun': False, 'SetupJitBench': True}
+    config = { 
+        'Arch': 'x64', 
+        'OS': 'Windows_NT', 
+        'CoreCLRBinPath': '', 
+        'Workspace': workingDir, 
+        'LocalRun': False, 
+        'RunCrossgen': True, 
+        'CLRSetup': True, 
+        'Branch': 'rel/2.0.0-preview1',
+        'TieredJitting': False
+    }
     
     parser = argparse.ArgumentParser(description='Patches JitBench with a local CLR and runs basic timings')
     parser.add_argument('--os', help='Operating system to target (Windows or Linux)')
     parser.add_argument('--arch', help='Architecture to target (x86 or x64)')
+    parser.add_argument('--clrsetup', type=bool_parser, help='Set to false to skip building and patching coreclr binaries')
     parser.add_argument('--coreclrbinpath', help='path to coreclr binaries to run JitBench (e.g. D:\\coreclr\\bin\\product\\Windows_NT.x64.Release\\)')
     parser.add_argument('--workspace', help='Local directory to clone JitBench in to')
-    parser.add_argument('--setupjitbench', help='Set to false if you want to skip enlisting\building\crossgening JitBench')
+    parser.add_argument('--runcrossgen', type=bool_parser, help='Set to false if you want to skip crossgening JitBench. MusicStore depends on crossgen, so it needs to be run at least once to initialize the store.')
+    parser.add_argument('--branch', help='the branch of JitBench to run.')
+    parser.add_argument('--tieredjitting', help='run with tiered jitting enabled.')
 
     args = parser.parse_args()
 
@@ -310,16 +345,31 @@ def parse_config():
     if args.coreclrbinpath != None:
         config['CoreCLRBinPath'] = args.coreclrbinpath
         config['LocalRun'] = True
-    if args.setupjitbench != None:
-        config['SetupJitBench'] = False
+    if args.runcrossgen == False:
+        config['RunCrossgen'] = False
     if args.workspace != None:
         config['Workspace'] = args.workspace
+    if args.clrsetup == False:
+        config['CLRSetup'] = args.clrsetup
+    if args.branch != None:
+        config['Branch'] = args.branch
+    if args.tieredjitting != None:
+        config['TieredJitting'] = args.tieredjitting
 
     workingDir = config['Workspace']
     if workingDir is None or workingDir.isspace():
         error("No workspace defined, must define through either environment variable WORKSPACE or --workspace command line option")
 
     return config
+
+def bool_parser(str):
+    val = str.lower()
+    if val == 'true' or val == 't':
+        return True
+    elif val == 'false' or val == 'f':
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Expected bool')
 
 if __name__ == '__main__':
     config = parse_config()
@@ -334,19 +384,22 @@ if __name__ == '__main__':
     remappedDir = 'X:\\'
     os.chdir(remappedDir)
 
-    coreClrBinPath = config['CoreCLRBinPath'];
-    if not coreClrBinPath or coreClrBinPath.isspace():
-        prepare_coreclr(config)
-        productIdentifier = '{}.{}.Release'.format(config['OS'], config['Arch'])
-        coreClrBinPath = os.path.join(remappedDir, 'coreclr', 'bin', 'Product', productIdentifier)
-        config['CoreCLRBinPath'] = coreClrBinPath
-    
-    if not os.path.isdir(coreClrBinPath):
-        error('CoreCLR bin path {} does not exist'.format(coreClrBinPath))
+    if config['CLRSetup']:
+        coreClrBinPath = config['CoreCLRBinPath'];
+        if not coreClrBinPath or coreClrBinPath.isspace():
+            prepare_coreclr(config)
+            productIdentifier = '{}.{}.Release'.format(config['OS'], config['Arch'])
+            coreClrBinPath = os.path.join(remappedDir, 'coreclr', 'bin', 'Product', productIdentifier)
+            config['CoreCLRBinPath'] = coreClrBinPath
+        
+        if not os.path.isdir(coreClrBinPath):
+            error('CoreCLR bin path {} does not exist'.format(coreClrBinPath))
 
     prepare_jitbench(config)
-    tieredFileName, iters = run_jitbench(config, True)
-    parse_output(tieredFileName, iters, '_TieredCompilation')
+    if config['TieredJitting']:
+        tieredFileName, iters = run_jitbench(config, True)
+        parse_output(tieredFileName, iters, '_TieredCompilation')
+    
     fileName, iters = run_jitbench(config, False)
     parse_output(fileName, iters, '')
 
