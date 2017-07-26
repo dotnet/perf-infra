@@ -326,7 +326,6 @@ def parse_config():
     parser.add_argument('--workspace', help='Local directory to clone JitBench in to')
     parser.add_argument('--runcrossgen', type=bool_parser, help='Set to false if you want to skip crossgening JitBench. MusicStore depends on crossgen, so it needs to be run at least once to initialize the store.')
     parser.add_argument('--branch', help='the branch of JitBench to run.')
-    parser.add_argument('--tieredjitting', help='run with tiered jitting enabled.')
 
     args = parser.parse_args()
 
@@ -353,8 +352,6 @@ def parse_config():
         config['CLRSetup'] = args.clrsetup
     if args.branch != None:
         config['Branch'] = args.branch
-    if args.tieredjitting != None:
-        config['TieredJitting'] = args.tieredjitting
 
     workingDir = config['Workspace']
     if workingDir is None or workingDir.isspace():
@@ -396,9 +393,8 @@ if __name__ == '__main__':
             error('CoreCLR bin path {} does not exist'.format(coreClrBinPath))
 
     prepare_jitbench(config)
-    if config['TieredJitting']:
-        tieredFileName, iters = run_jitbench(config, True)
-        parse_output(tieredFileName, iters, '_TieredCompilation')
+    tieredFileName, iters = run_jitbench(config, True)
+    parse_output(tieredFileName, iters, '_TieredCompilation')
     
     fileName, iters = run_jitbench(config, False)
     parse_output(fileName, iters, '')
