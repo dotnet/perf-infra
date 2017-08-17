@@ -148,7 +148,7 @@ def runParsec():
     targetFile = os.path.join(targetDir, 'blackscholes.tar.gz')
     downloadAndUnpack(benchmarkLocation, targetFile)
     
-    return runAndProcess("%WORKSPACE%\\blackscholes_cpp_serial 1 in_10M.txt prices.txt", parsecProcessResults)
+    return runAndProcess("START \"STABILITY_PERF_RUN\" /B /WAIT /HIGH /AFFINITY 0x2 %WORKSPACE%\\blackscholes_cpp_serial 1 in_10M.txt prices.txt", parsecProcessResults)
     
 # List of benchmarks to run
 benchmarkRunners = {'Parsec': runParsec}

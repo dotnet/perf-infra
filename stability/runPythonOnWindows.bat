@@ -1,4 +1,4 @@
-START "CORECLR_PERF_RUN" /B /WAIT /HIGH /AFFINITY 0x2 py %WORKSPACE%\stability\stability\windows_native-stability-test.py --iterations=11
+py %WORKSPACE%\stability\stability\windows_native-stability-test.py --iterations=11
 For /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set mydate=%%c-%%a-%%b)
 For /f "tokens=1-2 delims=: " %%a in ('time /t') do (set mytime=%%a:%%b)
 set timestamp=%mydate%T%mytime%:00Z
