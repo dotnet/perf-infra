@@ -22,7 +22,7 @@ folder('stability_testing') {}
 // 1) Native testing of known binaries (a few parsec benchmarks) that are very stable.
 // 2) Managed testing of known binaries that are stable
 
-['windows'].each { osFamily ->
+['windows', 'windows_server_2016'].each { osFamily ->
     def nativeStabilityJob = job(Utilities.getFullJobName("${osFamily}_native_stability_test", false, stabilityTestingFolderName)) {
         // Add a parameter to specify which nodes to run the stability job across
         parameters {
@@ -38,7 +38,7 @@ folder('stability_testing') {}
 					}
 				}
         steps {
-            if (osFamily == 'windows') {
+            if (osFamily != 'linux') {
                 batchFile("C:\\Tools\\nuget.exe install Microsoft.BenchView.JSONFormat -Source http://benchviewtestfeed.azurewebsites.net/nuget -OutputDirectory \"%WORKSPACE%\" -Prerelease -ExcludeVersion")
                 batchFile('stability\\runPythonOnWindows.bat')
             }
