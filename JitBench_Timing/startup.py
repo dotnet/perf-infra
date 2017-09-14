@@ -182,11 +182,11 @@ def prepare_jitbench(config):
 
     # publish the App
     if osStr == 'Windows_NT':
-        run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest %JITBENCH_ASPNET_MANIFEST%')
+        run_command('dotnet publish -c Release -f netcoreapp2.1 --manifest %JITBENCH_ASPNET_MANIFEST%')
     else:
-        run_command('dotnet publish -c Release -f netcoreapp2.0 --manifest $JITBENCH_ASPNET_MANIFEST')
+        run_command('dotnet publish -c Release -f netcoreapp2.1 --manifest $JITBENCH_ASPNET_MANIFEST')
 
-    publishPath = os.path.join('bin', 'Release', 'netcoreapp2.0', 'publish')
+    publishPath = os.path.join('bin', 'Release', 'netcoreapp2.1', 'publish')
     
     os.chdir(startDir)
 
@@ -270,7 +270,7 @@ def patch_runtime(jitBenchDir, config):
 def run_jitbench(config, tiered):
     startDir = os.getcwd()
 
-    targetDir = os.path.join('JitBench', 'src', 'MusicStore', 'bin', 'Release', 'netcoreapp2.0', 'publish')
+    targetDir = os.path.join('JitBench', 'src', 'MusicStore', 'bin', 'Release', 'netcoreapp2.1', 'publish')
     os.chdir(targetDir)
 
     targetCommand = 'dotnet MusicStore.dll' 
@@ -314,7 +314,7 @@ def parse_config():
         'LocalRun': False, 
         'RunCrossgen': True, 
         'CLRSetup': True, 
-        'Branch': 'rel/2.0.0-preview1',
+        'Branch': 'rel/2.0.0',
         'TieredJitting': False
     }
     
